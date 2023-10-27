@@ -62,7 +62,7 @@ func (io *ioState) writePgmImage() {
 	for i := range world {
 		world[i] = make([]byte, io.params.ImageWidth)
 	}
-
+	//sending the image byte by byte to the channel
 	for y := 0; y < io.params.ImageHeight; y++ {
 		for x := 0; x < io.params.ImageWidth; x++ {
 			val := <-io.channels.output
@@ -75,6 +75,7 @@ func (io *ioState) writePgmImage() {
 
 	for y := 0; y < io.params.ImageHeight; y++ {
 		for x := 0; x < io.params.ImageWidth; x++ {
+			//writes the image
 			_, ioError = file.Write([]byte{world[y][x]})
 			util.Check(ioError)
 		}
@@ -118,6 +119,8 @@ func (io *ioState) readPgmImage() {
 
 	image := []byte(fields[4])
 
+	//taking the image byte by byte with passing it down the channel
+	//this channel will be wired up with the distributor
 	for _, b := range image {
 		io.channels.input <- b
 	}
