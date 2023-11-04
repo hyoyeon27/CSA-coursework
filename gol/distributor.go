@@ -27,69 +27,17 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	return cells
 }
 
-//func calculateNextState(p Params, world [][]byte) [][]byte {
-//	newWorld := make([][]byte, p.ImageHeight)
-//	for y := range newWorld {
-//		newWorld[y] = make([]byte, p.ImageWidth)
-//	}
-//
-//	for y := 0; y < p.ImageHeight; y++ {
-//		for x := 0; x < p.ImageWidth; x++ {
-//			sum := (world[(y-1+p.ImageHeight)%p.ImageHeight][(x-1+p.ImageWidth)%p.ImageWidth])/255 + (world[(y-1+p.ImageHeight)%p.ImageHeight][(x+p.ImageWidth)%p.ImageWidth])/255 + (world[(y-1+p.ImageHeight)%p.ImageHeight][(x+1+p.ImageWidth)%p.ImageWidth])/255 +
-//				(world[(y+p.ImageHeight)%p.ImageHeight][(x-1+p.ImageWidth)%p.ImageWidth])/255 + (world[(y+p.ImageHeight)%p.ImageHeight][(x+1+p.ImageWidth)%p.ImageWidth])/255 +
-//				(world[(y+1+p.ImageHeight)%p.ImageHeight][(x-1+p.ImageWidth)%p.ImageWidth])/255 + (world[(y+1+p.ImageHeight)%p.ImageHeight][(x+p.ImageWidth)%p.ImageWidth])/255 + (world[(y+1+p.ImageHeight)%p.ImageHeight][(x+1+p.ImageWidth)%p.ImageWidth])/255
-//			if world[y][x] == 255 {
-//				if sum < 2 {
-//					newWorld[y][x] = 0
-//				} else if sum == 2 || sum == 3 {
-//					newWorld[y][x] = 255
-//				} else {
-//					newWorld[y][x] = 0
-//				}
-//			} else {
-//				if sum == 3 {
-//					newWorld[y][x] = 255
-//				}
-//			}
-//		}
-//	}
-//	return newWorld
-//}
-
-// ======================================================================================================================================
-func makeMatrix(height, width int) [][]uint8 {
-	matrix := make([][]uint8, height)
-	for i := range matrix {
-		matrix[i] = make([]uint8, width)
-	}
-	return matrix
-}
-
-//func makeImmutableMatrix(matrix [][]uint8) func(y, x int) uint8 {
-//	return func(y, x int) uint8 {
-//		return matrix[y][x]
-//	}
-//}
-
-func calculateNextState(startY, endY, startX, endX int, world [][]byte) [][]uint8 {
-	height := endY - startY
-	width := endX - startX
-
-	newWorld := make([][]byte, height)
+func calculateNextState(p Params, world [][]byte) [][]byte {
+	newWorld := make([][]byte, p.ImageHeight)
 	for y := range newWorld {
-		newWorld[y] = make([]byte, width)
+		newWorld[y] = make([]byte, p.ImageWidth)
 	}
-	//radius := 2
-	//midPoint := (5*5 + 1) / 2
 
-	//filteredMatrix := makeMatrix(height, width)
-	//filterValues := make([]int, 5*5)
-
-	for y := startY; y < endY; y++ {
-		for x := 0; x < width; x++ {
-			sum := (world[(y-1+height)%height][(x-1+width)%width])/255 + (world[(y-1+height)%height][(x+width)%width])/255 + (world[(y-1+height)%height][(x+1+width)%width])/255 +
-				(world[(y+height)%height][(x-1+width)%width])/255 + (world[(y+height)%height][(x+1+width)%width])/255 +
-				(world[(y+1+height)%height][(x-1+width)%width])/255 + (world[(y+1+height)%height][(x+width)%width])/255 + (world[(y+1+height)%height][(x+1+width)%width])/255
+	for y := 0; y < p.ImageHeight; y++ {
+		for x := 0; x < p.ImageWidth; x++ {
+			sum := (world[(y-1+p.ImageHeight)%p.ImageHeight][(x-1+p.ImageWidth)%p.ImageWidth])/255 + (world[(y-1+p.ImageHeight)%p.ImageHeight][(x+p.ImageWidth)%p.ImageWidth])/255 + (world[(y-1+p.ImageHeight)%p.ImageHeight][(x+1+p.ImageWidth)%p.ImageWidth])/255 +
+				(world[(y+p.ImageHeight)%p.ImageHeight][(x-1+p.ImageWidth)%p.ImageWidth])/255 + (world[(y+p.ImageHeight)%p.ImageHeight][(x+1+p.ImageWidth)%p.ImageWidth])/255 +
+				(world[(y+1+p.ImageHeight)%p.ImageHeight][(x-1+p.ImageWidth)%p.ImageWidth])/255 + (world[(y+1+p.ImageHeight)%p.ImageHeight][(x+p.ImageWidth)%p.ImageWidth])/255 + (world[(y+1+p.ImageHeight)%p.ImageHeight][(x+1+p.ImageWidth)%p.ImageWidth])/255
 			if world[y][x] == 255 {
 				if sum < 2 {
 					newWorld[y][x] = 0
@@ -108,10 +56,62 @@ func calculateNextState(startY, endY, startX, endX int, world [][]byte) [][]uint
 	return newWorld
 }
 
-func worker(startY, endY, startX, endX int, newWorld [][]byte, out chan<- [][]uint8) {
-	imagePart := calculateNextState(startY, endY, startX, endX, newWorld)
-	out <- imagePart
-}
+// ======================================================================================================================================
+//func makeMatrix(height, width int) [][]uint8 {
+//	matrix := make([][]uint8, height)
+//	for i := range matrix {
+//		matrix[i] = make([]uint8, width)
+//	}
+//	return matrix
+//}
+
+//func makeImmutableMatrix(matrix [][]uint8) func(y, x int) uint8 {
+//	return func(y, x int) uint8 {
+//		return matrix[y][x]
+//	}
+//}
+
+//func calculateNextState(startY, endY, startX, endX int, world [][]byte) [][]uint8 {
+//	height := endY - startY
+//	width := endX - startX
+//
+//	newWorld := make([][]byte, height)
+//	for y := range newWorld {
+//		newWorld[y] = make([]byte, width)
+//	}
+//	//radius := 2
+//	//midPoint := (5*5 + 1) / 2
+//
+//	//filteredMatrix := makeMatrix(height, width)
+//	//filterValues := make([]int, 5*5)
+//
+//	for y := startY; y < endY; y++ {
+//		for x := 0; x < width; x++ {
+//			sum := (world[(y-1+height)%height][(x-1+width)%width])/255 + (world[(y-1+height)%height][(x+width)%width])/255 + (world[(y-1+height)%height][(x+1+width)%width])/255 +
+//				(world[(y+height)%height][(x-1+width)%width])/255 + (world[(y+height)%height][(x+1+width)%width])/255 +
+//				(world[(y+1+height)%height][(x-1+width)%width])/255 + (world[(y+1+height)%height][(x+width)%width])/255 + (world[(y+1+height)%height][(x+1+width)%width])/255
+//			if world[y][x] == 255 {
+//				if sum < 2 {
+//					newWorld[y][x] = 0
+//				} else if sum == 2 || sum == 3 {
+//					newWorld[y][x] = 255
+//				} else {
+//					newWorld[y][x] = 0
+//				}
+//			} else {
+//				if sum == 3 {
+//					newWorld[y][x] = 255
+//				}
+//			}
+//		}
+//	}
+//	return newWorld
+//}
+//
+//func worker(startY, endY, startX, endX int, newWorld [][]byte, out chan<- [][]uint8) {
+//	imagePart := calculateNextState(startY, endY, startX, endX, newWorld)
+//	out <- imagePart
+//}
 
 //func filter(filepathIn, filepathOut string, threads int) {
 //	//image.RegisterFormat("png", "PNG", png.Decode, png.DecodeConfig)
@@ -156,7 +156,7 @@ func worker(startY, endY, startX, endX int, newWorld [][]byte, out chan<- [][]ui
 
 //======================================================================================================================================
 
-func distributor(p Params, c distributorChannels) {
+/*func distributor(p Params, c distributorChannels) {
 	c.ioCommand <- ioInput
 	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
 
@@ -182,14 +182,10 @@ func distributor(p Params, c distributorChannels) {
 	var newPixelData [][]uint8
 	threads := p.Threads
 
-	fmt.Println("BEFORE FOR LOOP")
 	for turn := 0; turn <= p.Turns; turn++ {
-		fmt.Println("Turn: ", turn)
 		if threads == 1 {
-			fmt.Println("threads == 1")
 			newPixelData = calculateNextState(0, height, 0, width, newWorld)
 		} else {
-			fmt.Println("else")
 			workerHeight := height / threads
 			out := make([]chan [][]uint8, threads)
 
@@ -210,7 +206,6 @@ func distributor(p Params, c distributorChannels) {
 		}
 	}
 	workersWorld := newPixelData
-	fmt.Println(workersWorld)
 
 	// TODO: Execute all turns of the Game of Life.
 	//for turn := 0; turn < p.Turns; turn++ {
@@ -255,69 +250,69 @@ func distributor(p Params, c distributorChannels) {
 
 	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
 	close(c.events)
-}
+}*/
 
-//func distributor(p Params, c distributorChannels) {
-//	c.ioCommand <- ioInput
-//	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
-//
-//	// distributor divides the work between workers and interacts with other goroutines.
-//	// TODO: Create a 2D slice to store the world.
-//	world := make([][]byte, p.ImageHeight)
-//	for y := range world {
-//		world[y] = make([]byte, p.ImageWidth)
-//		for x := range world[y] {
-//			if <-c.ioInput > 0 {
-//				world[y][x] = 255
-//			} else {
-//				world[y][x] = 0
-//			}
-//		}
-//	}
-//
-//	newWorld := world
-//
-//	// TODO: Execute all turns of the Game of Life.
-//	for turn := 0; turn < p.Turns; turn++ {
-//		newWorld = calculateNextState(p, newWorld)
-//	}
-//
-//	// TODO: Report the final state using FinalTurnCompleteEvent.
-//
-//	c.events <- FinalTurnComplete{
-//		CompletedTurns: p.Turns,
-//		Alive:          calculateAliveCells(p, newWorld),
-//	}
-//
-//	// Make sure that the Io has finished any output before exiting.
-//	c.ioCommand <- ioCheckIdle
-//	<-c.ioIdle
-//
-//	c.events <- StateChange{p.Turns, Quitting}
-//
-//	ticker := time.NewTicker(2 * time.Second)
-//	for turn := 0; turn < p.Turns; turn++ {
-//
-//		AliveCellsCountChan := make(chan AliveCellsCount)
-//
-//		go func(turn int) {
-//			for {
-//				select {
-//				case <-ticker.C:
-//					AliveCellsCountChan <- AliveCellsCount{
-//						CompletedTurns: p.Turns,
-//						CellsCount:     binary.Size(calculateAliveCells(p, newWorld))}
-//				}
-//			}
-//		}(turn)
-//		AliveCellsCount := <-AliveCellsCountChan
-//		c.events <- AliveCellsCount
-//
-//		c.events <- TurnComplete{
-//			CompletedTurns: p.Turns,
-//		}
-//	}
-//
-//	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
-//	close(c.events)
-//}
+func distributor(p Params, c distributorChannels) {
+	c.ioCommand <- ioInput
+	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
+
+	// distributor divides the work between workers and interacts with other goroutines.
+	// TODO: Create a 2D slice to store the world.
+	world := make([][]byte, p.ImageHeight)
+	for y := range world {
+		world[y] = make([]byte, p.ImageWidth)
+		for x := range world[y] {
+			if <-c.ioInput > 0 {
+				world[y][x] = 255
+			} else {
+				world[y][x] = 0
+			}
+		}
+	}
+
+	newWorld := world
+
+	// TODO: Execute all turns of the Game of Life.
+	for turn := 0; turn < p.Turns; turn++ {
+		newWorld = calculateNextState(p, newWorld)
+	}
+
+	// TODO: Report the final state using FinalTurnCompleteEvent.
+
+	c.events <- FinalTurnComplete{
+		CompletedTurns: p.Turns,
+		Alive:          calculateAliveCells(p, newWorld),
+	}
+
+	// Make sure that the Io has finished any output before exiting.
+	c.ioCommand <- ioCheckIdle
+	<-c.ioIdle
+
+	c.events <- StateChange{p.Turns, Quitting}
+	//
+	//ticker := time.NewTicker(2 * time.Second)
+	//for turn := 0; turn < p.Turns; turn++ {
+	//
+	//	AliveCellsCountChan := make(chan AliveCellsCount)
+	//
+	//	go func(turn int) {
+	//		for {
+	//			select {
+	//			case <-ticker.C:
+	//				AliveCellsCountChan <- AliveCellsCount{
+	//					CompletedTurns: p.Turns,
+	//					CellsCount:     binary.Size(calculateAliveCells(p, newWorld))}
+	//			}
+	//		}
+	//	}(turn)
+	//	AliveCellsCount := <-AliveCellsCountChan
+	//	c.events <- AliveCellsCount
+	//
+	//	c.events <- TurnComplete{
+	//		CompletedTurns: p.Turns,
+	//	}
+	//}
+
+	// Close the channel to stop the SDL goroutine gracefully. Removing may cause deadlock.
+	close(c.events)
+}
