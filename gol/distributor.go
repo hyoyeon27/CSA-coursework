@@ -36,8 +36,9 @@ func makeMatrix(height, width int) [][]uint8 {
 	return matrix
 }
 
-func calculateNextState(startY, endY, width int, world [][]byte) [][]uint8 {
-	height := endY - startY
+func calculateNextState(p Params, startY, endY, width int, world [][]byte) [][]uint8 {
+	//height := endY - startY
+	height := p.ImageHeight
 
 	newWorld := make([][]byte, height)
 	for y := range newWorld {
@@ -67,8 +68,8 @@ func calculateNextState(startY, endY, width int, world [][]byte) [][]uint8 {
 	return newWorld
 }
 
-func worker(startY, endY, width int, newWorld [][]byte, out chan<- [][]uint8) {
-	imagePart := calculateNextState(startY, endY, width, newWorld)
+func worker(p Params, startY, endY, width int, newWorld [][]byte, out chan<- [][]uint8) {
+	imagePart := calculateNextState(p, startY, endY, width, newWorld)
 	out <- imagePart
 }
 
@@ -102,7 +103,7 @@ func distributor(p Params, c distributorChannels) {
 
 	for turn := 0; turn < p.Turns; turn++ {
 		if threads == 1 {
-			newWorld = calculateNextState(0, height, width, newWorld)
+			newWorld = calculateNextState(p, 0, height, width, newWorld)
 		} else {
 			workerHeight := height / threads
 			out := make([]chan [][]uint8, threads)
@@ -112,7 +113,7 @@ func distributor(p Params, c distributorChannels) {
 			}
 
 			for i := 0; i < threads; i++ {
-				go worker(i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
+				go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
 			}
 
 			newWorld = makeMatrix(0, 0)
