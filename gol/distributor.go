@@ -85,7 +85,7 @@ func calculateNextState(startY, endY, startX, endX int, world [][]byte) [][]uint
 	//filteredMatrix := makeMatrix(height, width)
 	//filterValues := make([]int, 5*5)
 
-	for y := 0; y < height; y++ {
+	for y := startY; y < startY+height; y++ {
 		for x := 0; x < width; x++ {
 			sum := (world[(y-1+height)%height][(x-1+width)%width])/255 + (world[(y-1+height)%height][(x+width)%width])/255 + (world[(y-1+height)%height][(x+1+width)%width])/255 +
 				(world[(y+height)%height][(x-1+width)%width])/255 + (world[(y+height)%height][(x+1+width)%width])/255 +
@@ -181,12 +181,16 @@ func distributor(p Params, c distributorChannels) {
 
 	var newPixelData [][]uint8
 	threads := p.Threads
+
 	for turn := 0; turn < p.Turns; turn++ {
 		if threads == 1 {
+			fmt.Println("threads == 1")
 			newPixelData = calculateNextState(0, height, 0, width, newWorld)
 		} else {
+			fmt.Println("else")
 			workerHeight := height / threads
 			out := make([]chan [][]uint8, threads)
+
 			for i := range out {
 				out[i] = make(chan [][]uint8)
 			}
@@ -203,8 +207,8 @@ func distributor(p Params, c distributorChannels) {
 			}
 		}
 	}
-
 	workersWorld := newPixelData
+	fmt.Println(workersWorld)
 
 	// TODO: Execute all turns of the Game of Life.
 	//for turn := 0; turn < p.Turns; turn++ {
