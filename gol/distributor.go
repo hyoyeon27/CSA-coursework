@@ -116,7 +116,7 @@ func distributor(p Params, c distributorChannels) {
 				go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
 			}
 
-			newWorld = makeMatrix(0, 0)
+			//newWorld = makeMatrix(0, 0)
 
 			for i := 0; i < threads; i++ {
 				part := <-out[i]
