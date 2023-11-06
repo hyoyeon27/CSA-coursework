@@ -98,33 +98,49 @@ func distributor(p Params, c distributorChannels) {
 
 	newWorld := world
 
-	//var newPixelData [][]uint8
 	threads := p.Threads
+	var workersWorld [][]uint8
 
-	for turn := 0; turn < p.Turns; turn++ {
-		if threads == 1 {
-			newWorld = calculateNextState(p, 0, height, width, newWorld)
-		} else {
-			workerHeight := height / threads
-			out := make([]chan [][]uint8, threads)
+	if p.Turns == 0 {
+		workersWorld = newWorld
+	} else {
+		for turn := 0; turn < p.Turns; turn++ {
+			if threads == 1 {
+				newWorld = calculateNextState(p, 0, height, width, newWorld)
+				workersWorld = newWorld
+			} else {
+				workerHeight := height / threads
+				out := make([]chan [][]uint8, threads)
+				for i := range out {
+					out[i] = make(chan [][]uint8)
+				}
 
-			for i := range out {
-				out[i] = make(chan [][]uint8)
-			}
+				if p.ImageHeight%p.Threads == 0 { // when the thread can be divided
+					for i := 0; i < threads; i++ {
+						go worker(p, i*workerHeight, (i+1)*workerHeight, p.ImageWidth, newWorld, out[i])
+					}
+				} else { // when the thread cannot be divided by the thread(has remainders)
+					for i := 0; i < p.Threads; i++ {
+						if i == (p.Threads - 1) { // if it is the last thread
+							go worker(p, i*workerHeight, workerHeight, p.ImageWidth, newWorld, out[i])
+						} else { //else
+							go worker(p, i*workerHeight, (i+1)*workerHeight, p.ImageWidth, newWorld, out[i])
+						}
+					}
+				}
 
-			for i := 0; i < threads; i++ {
-				go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
-			}
+				workersWorld = makeMatrix(0, 0)
 
-			//newWorld = makeMatrix(0, 0)
-
-			for i := 0; i < threads; i++ {
-				part := <-out[i]
-				newWorld = append(newWorld, part...)
+				for i := 0; i < threads; i++ {
+					fmt.Println("I am appending!!")
+					part := <-out[i]
+					workersWorld = append(workersWorld, part...)
+				}
 			}
 		}
 	}
-	workersWorld := newWorld
+
+	finalWorld := workersWorld
 
 	// TODO: Execute all turns of the Game of Life.
 
@@ -132,7 +148,7 @@ func distributor(p Params, c distributorChannels) {
 
 	c.events <- FinalTurnComplete{
 		CompletedTurns: p.Turns,
-		Alive:          calculateAliveCells(p, workersWorld),
+		Alive:          calculateAliveCells(p, finalWorld),
 	}
 
 	// Make sure that the Io has finished any output before exiting.
@@ -143,3 +159,77 @@ func distributor(p Params, c distributorChannels) {
 
 	close(c.events)
 }
+
+//func distributor(p Params, c distributorChannels) {
+//	c.ioCommand <- ioInput
+//	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
+//
+//	height := p.ImageHeight
+//	width := p.ImageWidth
+//
+//	// distributor divides the work between workers and interacts with other goroutines.
+//	// TODO: Create a 2D slice to store the world.
+//	world := make([][]byte, p.ImageHeight)
+//	for y := range world {
+//		world[y] = make([]byte, p.ImageWidth)
+//		for x := range world[y] {
+//			if <-c.ioInput > 0 {
+//				world[y][x] = 255
+//			} else {
+//				world[y][x] = 0
+//			}
+//		}
+//	}
+//
+//	newWorld := world
+//
+//	threads := p.Threads
+//	var workersWorld [][]uint8
+//
+//	if p.Turns == 0 {
+//		workersWorld = newWorld
+//	} else {
+//		for turn := 0; turn < p.Turns; turn++ {
+//			if threads == 1 {
+//				newWorld = calculateNextState(p, 0, height, width, newWorld)
+//				workersWorld = newWorld
+//			} else {
+//				workerHeight := height / threads
+//				out := make([]chan [][]uint8, threads)
+//
+//				for i := range out {
+//					out[i] = make(chan [][]uint8)
+//				}
+//
+//				for i := 0; i < threads; i++ {
+//					go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
+//				}
+//
+//				workersWorld = makeMatrix(0, 0)
+//
+//				for i := 0; i < threads; i++ {
+//					part := <-out[i]
+//					workersWorld = append(workersWorld, part...)
+//				}
+//			}
+//		}
+//	}
+//	finalWorld := workersWorld
+//
+//	// TODO: Execute all turns of the Game of Life.
+//
+//	// TODO: Report the final state using FinalTurnCompleteEvent.
+//
+//	c.events <- FinalTurnComplete{
+//		CompletedTurns: p.Turns,
+//		Alive:          calculateAliveCells(p, finalWorld),
+//	}
+//
+//	// Make sure that the Io has finished any output before exiting.
+//	c.ioCommand <- ioCheckIdle
+//	<-c.ioIdle
+//
+//	c.events <- StateChange{p.Turns, Quitting}
+//
+//	close(c.events)
+//}
