@@ -72,6 +72,7 @@ func worker(p Params, startY, endY, width int, newWorld [][]byte, out chan<- [][
 }
 
 func countingCells(p Params, world [][]uint8) int {
+	fmt.Println("ENTERED COUNTING CELLS")
 	cells := 0
 
 	for y := 0; y < p.ImageHeight; y++ {
@@ -185,7 +186,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	if threads == 1 {
 		for turn := 0; turn < p.Turns; turn++ {
-			fmt.Sprintf("IF Turn: ", turn)
+			fmt.Println("Turn: ", turn)
 			chk := calculateAliveCells(p, world)
 			for _, cell := range chk {
 				c.events <- CellFlipped{turn + 1, cell}
@@ -242,6 +243,8 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			//newWorld = newPixelData
 			cellsWorld = newWorld
 			finishedTurns++
+			fmt.Println("FINISHEDTURNS: ", finishedTurns)
+
 			c.events <- TurnComplete{turn + 1}
 		}
 		//finalWorld = world
