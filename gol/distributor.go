@@ -92,7 +92,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	c.ioFilename <- fmt.Sprintf("%dx%d", width, height)
 
 	var m sync.Mutex
-	//var newPixelData [][]uint8
+	var cellsWorld [][]uint8
 
 	var finishedTurns int
 
@@ -126,7 +126,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		for {
 			select {
 			case <-t.C: //when value passed down to the channel, alert events
-				c.events <- AliveCellsCount{finishedTurns, countingCells(p, newWorld)}
+				c.events <- AliveCellsCount{finishedTurns, countingCells(p, cellsWorld)}
 
 			case f := <-fin: //passing down the value to the channel
 				if f == true { //if true, stop
@@ -191,6 +191,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 				c.events <- CellFlipped{turn + 1, cell}
 			}
 			newWorld = calculateNextState(p, 0, height, width, newWorld)
+			cellsWorld = newWorld
 			finishedTurns++
 			c.events <- TurnComplete{turn + 1}
 		}
@@ -239,6 +240,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 				m.Unlock()
 			}
 			//newWorld = newPixelData
+			cellsWorld = newWorld
 			finishedTurns++
 			c.events <- TurnComplete{turn + 1}
 		}
