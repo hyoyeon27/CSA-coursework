@@ -38,10 +38,10 @@ func makeMatrix(height, width int) [][]uint8 {
 }
 
 func calculateNextState(p Params, startY, endY, width int, world [][]byte) [][]uint8 {
-	semiHeight := endY - startY
+	workersHeight := endY - startY
 	height := p.ImageHeight
 
-	newWorld := makeMatrix(semiHeight, width)
+	newWorld := makeMatrix(workersHeight, width)
 
 	for y := startY; y < endY; y++ {
 		for x := 0; x < width; x++ {
@@ -67,7 +67,7 @@ func calculateNextState(p Params, startY, endY, width int, world [][]byte) [][]u
 }
 
 func worker(p Params, startY, endY, width int, newWorld [][]byte, out chan<- [][]uint8) {
-	imagePart := calculateNextState(p, startY, endY, p.ImageWidth, newWorld)
+	imagePart := calculateNextState(p, startY, endY, width, newWorld)
 	out <- imagePart
 }
 
@@ -88,12 +88,10 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	c.ioCommand <- ioInput
 	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
 
-	//height := p.ImageHeight
+	height := p.ImageHeight
 	width := p.ImageWidth
 
-	var m sync.Mutex
-	var finalWorld [][]uint8
-	var newPixelData [][]uint8
+	var mutex sync.Mutex
 
 	var finishedTurns int
 
@@ -101,9 +99,9 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	// distributor divides the work between workers and interacts with other goroutines.
 	// TODO: Create a 2D slice to store the world.
-	world := make([][]byte, p.ImageHeight)
+	world := make([][]byte, height)
 	for y := range world {
-		world[y] = make([]byte, p.ImageWidth)
+		world[y] = make([]byte, width)
 		for x := range world[y] {
 			if <-c.ioInput > 0 {
 				world[y][x] = 255
@@ -113,7 +111,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		}
 	}
 
-	//newWorld := world
+	newWorld := world
 
 	//keypress (STEP 5)
 
@@ -144,58 +142,58 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	}()
 
 	threads := p.Threads
-	//var workersWorld [][]uint8
 
-	if threads == 1 {
-		for turn := 0; turn < p.Turns; turn++ {
-			fmt.Sprintf("IF Turn: ", turn)
-			world = calculateNextState(p, 0, p.ImageHeight, width, world)
-			//result = calculateInitial(p, width, world)
-			finishedTurns++
-			c.events <- TurnComplete{turn + 1}
-		}
-		finalWorld = world
-	} else {
-		workerHeight := p.ImageHeight / threads
-		out := make([]chan [][]uint8, threads)
-		for i := range out {
-			out[i] = make(chan [][]uint8)
-		}
+	for turn := 0; turn < p.Turns; turn++ {
+		if threads == 1 {
+			newWorld = calculateNextState(p, 0, height, width, newWorld)
+		} else {
+			workerHeight := height / threads
+			outFir := make([]chan [][]uint8, threads)
+			for i := range outFir {
+				outFir[i] = make(chan [][]uint8)
+			}
 
-		// TODO: Execute all turns of the Game of Life.
-		for turn := 0; turn < p.Turns; turn++ {
-			newPixelData = make([][]uint8, 0)
-			if p.ImageHeight%p.Threads == 0 { // when the thread can be divided
-				for i := 0; i < p.Threads; i++ {
-					go worker(p, i*workerHeight, (i+1)*workerHeight, p.ImageWidth, world, out[i])
+			outSec := make([]chan [][]uint8, threads)
+			for i := range outSec {
+				outSec[i] = make(chan [][]uint8)
+			}
+
+			if height%threads == 0 { // when the thread can be divided
+				for i := 0; i < threads; i++ {
+					go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, outFir[i])
 				}
-				m.Lock()
-				for j := 0; j < p.Threads; j++ {
-					result := <-out[j]
-					newPixelData = append(newPixelData, result...)
+
+				newWorld = makeMatrix(0, 0)
+
+				for i := 0; i < threads; i++ {
+					part := <-outFir[i]
+					mutex.Lock()
+					newWorld = append(newWorld, part...)
+					mutex.Unlock()
 				}
-				m.Unlock()
+
 			} else { // when the thread cannot be divided by the thread(has remainders)
-				for i := 0; i < p.Threads; i++ {
-					if i == (p.Threads - 1) { // if it is the last thread  //half of them working on 36 and others dividing the remainder evenly
-						go worker(p, i*workerHeight, p.ImageHeight, p.ImageWidth, world, out[i])
+				for i := 0; i < threads; i++ {
+					if i == (p.Threads - 1) { // if it is the last thread
+						go worker(p, i*workerHeight, height, width, newWorld, outSec[i])
 					} else { //else
-						go worker(p, i*workerHeight, (i+1)*workerHeight, p.ImageWidth, world, out[i])
+						go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, outSec[i])
 					}
 				}
-				m.Lock()
-				for j := 0; j < p.Threads; j++ {
-					result := <-out[j]
-					newPixelData = append(newPixelData, result...)
+
+				newWorld = makeMatrix(0, 0)
+
+				for i := 0; i < threads; i++ {
+					part := <-outSec[i]
+					mutex.Lock()
+					newWorld = append(newWorld, part...)
+					mutex.Unlock()
 				}
-				m.Unlock()
 			}
-			world = newPixelData
-			finishedTurns++
-			c.events <- TurnComplete{turn + 1}
 		}
-		finalWorld = world
 	}
+
+	finalWorld := newWorld
 
 	// TODO: Report the final state using FinalTurnCompleteEvent.
 
