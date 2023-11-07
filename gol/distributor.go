@@ -2,6 +2,7 @@ package gol
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 	"uk.ac.bris.cs/gameoflife/util"
@@ -114,16 +115,11 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	newWorld := world
 
-	//keypress (STEP 5)
-
-	// TODO: CAN I add a channel or import library from the github <- ask
-	go func() {
-		keyboard := <-keyPresses
-		switch keyboard {
-		//case "s":
-		//	//somethin
-		}
-	}()
+	// Make sure to send this event for all cells that are alive when the image is loaded in.
+	flip := calculateAliveCells(p, world)
+	for _, cell := range flip {
+		c.events <- CellFlipped{0, cell}
+	}
 
 	//Ticker (STEP 3)
 	go func() {
@@ -142,14 +138,59 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		}
 	}()
 
+	//keypress (STEP 5)
+	// TODO: CAN I add a channel or import library from the github <- ask
+	go func() {
+		keyboard := <-keyPresses
+		for {
+			if keyboard == 's' {
+				c.ioCommand <- ioOutput
+				c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
+				for y := 0; y < p.ImageHeight; y++ {
+					for x := 0; x < p.ImageWidth; x++ {
+						c.ioOutput <- world[y][x]
+					}
+				}
+			} else if keyboard == 'q' {
+				c.ioCommand <- ioOutput
+				c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
+				for y := 0; y < p.ImageHeight; y++ {
+					for x := 0; x < p.ImageWidth; x++ {
+						c.ioOutput <- world[y][x]
+					}
+				}
+				c.events <- ImageOutputComplete{p.Turns, fmt.Sprintf("%dx%d", width, height)}
+				c.ioCommand <- ioCheckIdle
+				<-c.ioIdle
+				c.events <- StateChange{p.Turns, Quitting}
+				close(c.events)
+				os.Exit(0)
+			} else if keyboard == 'p' {
+				c.events <- StateChange{finishedTurns, Paused}
+				fmt.Println("Current turn being processed: ", finishedTurns)
+				m.Lock()
+				keyboard = <-keyPresses
+				if keyboard == 'p' {
+					c.events <- StateChange{finishedTurns, Executing}
+					fmt.Println("Continuing")
+				}
+				m.Unlock()
+
+			}
+		}
+	}()
+
 	threads := p.Threads
 	//var workersWorld [][]uint8
 
 	if threads == 1 {
 		for turn := 0; turn < p.Turns; turn++ {
 			fmt.Sprintf("IF Turn: ", turn)
+			chk := calculateAliveCells(p, world)
+			for _, cell := range chk {
+				c.events <- CellFlipped{turn + 1, cell}
+			}
 			newWorld = calculateNextState(p, 0, height, width, newWorld)
-			//result = calculateInitial(p, width, world)
 			finishedTurns++
 			c.events <- TurnComplete{turn + 1}
 		}
@@ -164,6 +205,10 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		// TODO: Execute all turns of the Game of Life.
 		for turn := 0; turn < p.Turns; turn++ {
 			newPixelData = make([][]uint8, 0)
+			chk := calculateAliveCells(p, world)
+			for _, cell := range chk {
+				c.events <- CellFlipped{turn + 1, cell}
+			}
 			if height%threads == 0 { // when the thread can be divided
 				for i := 0; i < threads; i++ {
 					go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
