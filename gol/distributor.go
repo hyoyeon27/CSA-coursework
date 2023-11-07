@@ -217,6 +217,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		}
 	}
 
+	c.events <- ImageOutputComplete{p.Turns, fmt.Sprintf("%dx%d", width, height)}
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
 	<-c.ioIdle
