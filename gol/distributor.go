@@ -2,7 +2,6 @@ package gol
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"time"
 	"uk.ac.bris.cs/gameoflife/util"
@@ -145,17 +144,18 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		for {
 			if keyboard == 's' {
 				c.ioCommand <- ioOutput
-				c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
-				for y := 0; y < p.ImageHeight; y++ {
-					for x := 0; x < p.ImageWidth; x++ {
+				c.ioFilename <- fmt.Sprintf("%dx%d", height, width)
+				for y := 0; y < height; y++ {
+					for x := 0; x < width; x++ {
 						c.ioOutput <- world[y][x]
 					}
 				}
+				c.events <- ImageOutputComplete{p.Turns, fmt.Sprintf("%dx%d", width, height)}
 			} else if keyboard == 'q' {
 				c.ioCommand <- ioOutput
-				c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageHeight, p.ImageWidth)
-				for y := 0; y < p.ImageHeight; y++ {
-					for x := 0; x < p.ImageWidth; x++ {
+				c.ioFilename <- fmt.Sprintf("%dx%d", height, width)
+				for y := 0; y < height; y++ {
+					for x := 0; x < width; x++ {
 						c.ioOutput <- world[y][x]
 					}
 				}
@@ -164,7 +164,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 				<-c.ioIdle
 				c.events <- StateChange{p.Turns, Quitting}
 				close(c.events)
-				os.Exit(0)
+				//os.Exit(0)
 			} else if keyboard == 'p' {
 				c.events <- StateChange{finishedTurns, Paused}
 				fmt.Println("Current turn being processed: ", finishedTurns)
