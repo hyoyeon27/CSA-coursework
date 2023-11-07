@@ -92,7 +92,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	c.ioFilename <- fmt.Sprintf("%dx%d", width, height)
 
 	var m sync.Mutex
-	var newPixelData [][]uint8
+	//var newPixelData [][]uint8
 
 	var finishedTurns int
 
@@ -204,7 +204,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 		// TODO: Execute all turns of the Game of Life.
 		for turn := 0; turn < p.Turns; turn++ {
-			newPixelData = make([][]uint8, 0)
+			//newPixelData = make([][]uint8, 0)
 			chk := calculateAliveCells(p, world)
 			for _, cell := range chk {
 				c.events <- CellFlipped{turn + 1, cell}
@@ -214,9 +214,11 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 					go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
 				}
 				m.Lock()
+				newWorld = makeMatrix(0, 0)
+
 				for j := 0; j < threads; j++ {
 					output := <-out[j]
-					newPixelData = append(newPixelData, output...)
+					newWorld = append(newWorld, output...)
 				}
 				m.Unlock()
 			} else { // when the thread cannot be divided by the thread(has remainders)
@@ -228,13 +230,15 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 					}
 				}
 				m.Lock()
+				newWorld = makeMatrix(0, 0)
+
 				for j := 0; j < threads; j++ {
 					output := <-out[j]
-					newPixelData = append(newPixelData, output...)
+					newWorld = append(newWorld, output...)
 				}
 				m.Unlock()
 			}
-			newWorld = newPixelData
+			//newWorld = newPixelData
 			finishedTurns++
 			c.events <- TurnComplete{turn + 1}
 		}
