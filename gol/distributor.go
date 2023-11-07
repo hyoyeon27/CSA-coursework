@@ -29,7 +29,6 @@ func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	return cells
 }
 
-// ======================================================================================================================================
 func makeMatrix(height, width int) [][]uint8 {
 	matrix := make([][]uint8, height)
 	for i := range matrix {
@@ -39,12 +38,10 @@ func makeMatrix(height, width int) [][]uint8 {
 }
 
 func calculateNextState(p Params, startY, endY, width int, world [][]byte) [][]uint8 {
+	semiHeight := endY - startY
 	height := p.ImageHeight
 
-	newWorld := make([][]byte, height)
-	for y := range newWorld {
-		newWorld[y] = make([]byte, width)
-	}
+	newWorld := makeMatrix(semiHeight, width)
 
 	for y := startY; y < endY; y++ {
 		for x := 0; x < width; x++ {
@@ -53,15 +50,15 @@ func calculateNextState(p Params, startY, endY, width int, world [][]byte) [][]u
 				(world[(y+1+height)%height][(x-1+width)%width])/255 + (world[(y+1+height)%height][(x+width)%width])/255 + (world[(y+1+height)%height][(x+1+width)%width])/255
 			if world[y][x] == 255 {
 				if sum < 2 {
-					newWorld[y][x] = 0
+					newWorld[y-startY][x] = 0
 				} else if sum == 2 || sum == 3 {
-					newWorld[y][x] = 255
+					newWorld[y-startY][x] = 255
 				} else {
-					newWorld[y][x] = 0
+					newWorld[y-startY][x] = 0
 				}
 			} else {
 				if sum == 3 {
-					newWorld[y][x] = 255
+					newWorld[y-startY][x] = 255
 				}
 			}
 		}
@@ -87,9 +84,7 @@ func countingCells(p Params, world [][]uint8) int {
 	return cells
 }
 
-//======================================================================================================================================
-
-func distributor(p Params, c distributorChannels) {
+func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	c.ioCommand <- ioInput
 	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
 
@@ -120,15 +115,27 @@ func distributor(p Params, c distributorChannels) {
 
 	//newWorld := world
 
+	//keypress (STEP 5)
+
+	// TODO: CAN I add a channel or import library from the github <- ask
+	go func() {
+		keyboard := <-keyPresses
+		switch keyboard {
+		//case "s":
+		//	//somethin
+		}
+	}()
+
+	//Ticker (STEP 3)
 	go func() {
 		t := time.NewTicker(2 * time.Second)
 		for {
 			select {
-			case <-t.C:
+			case <-t.C: //when value passed down to the channel, alert events
 				c.events <- AliveCellsCount{finishedTurns, countingCells(p, world)}
 
-			case f := <-fin:
-				if f == true {
+			case f := <-fin: //passing down the value to the channel
+				if f == true { //if true, stop
 					t.Stop()
 				}
 			}
@@ -170,7 +177,7 @@ func distributor(p Params, c distributorChannels) {
 				m.Unlock()
 			} else { // when the thread cannot be divided by the thread(has remainders)
 				for i := 0; i < p.Threads; i++ {
-					if i == (p.Threads - 1) { // if it is the last thread
+					if i == (p.Threads - 1) { // if it is the last thread  //half of them working on 36 and others dividing the remainder evenly
 						go worker(p, i*workerHeight, p.ImageHeight, p.ImageWidth, world, out[i])
 					} else { //else
 						go worker(p, i*workerHeight, (i+1)*workerHeight, p.ImageWidth, world, out[i])
@@ -198,14 +205,17 @@ func distributor(p Params, c distributorChannels) {
 	}
 
 	fin <- true
-	//c.ioCommand <- ioOutput
-	//c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
-	//for y := 0; y < p.ImageHeight; y++ {
-	//	for x := 0; x < p.ImageWidth; x++ {
-	//		result := finalWorld[y][x]
-	//		c.ioOutput <- result
-	//	}
-	//}
+
+	//output (Step 3)
+	c.ioCommand <- ioOutput
+	c.ioFilename <- fmt.Sprintf("%dx%d", p.ImageWidth, p.ImageHeight)
+	//Sending out the output
+	for y := 0; y < p.ImageHeight; y++ {
+		for x := 0; x < p.ImageWidth; x++ {
+			result := finalWorld[y][x]
+			c.ioOutput <- result
+		}
+	}
 
 	// Make sure that the Io has finished any output before exiting.
 	c.ioCommand <- ioCheckIdle
