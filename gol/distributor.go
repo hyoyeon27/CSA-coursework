@@ -148,25 +148,20 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			newWorld = calculateNextState(p, 0, height, width, newWorld)
 		} else {
 			workerHeight := height / threads
-			outFir := make([]chan [][]uint8, threads)
-			for i := range outFir {
-				outFir[i] = make(chan [][]uint8)
-			}
-
-			outSec := make([]chan [][]uint8, threads)
-			for i := range outSec {
-				outSec[i] = make(chan [][]uint8)
+			out := make([]chan [][]uint8, threads)
+			for i := range out {
+				out[i] = make(chan [][]uint8)
 			}
 
 			if height%threads == 0 { // when the thread can be divided
 				for i := 0; i < threads; i++ {
-					go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, outFir[i])
+					go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
 				}
 
 				newWorld = makeMatrix(0, 0)
 
 				for i := 0; i < threads; i++ {
-					part := <-outFir[i]
+					part := <-out[i]
 					mutex.Lock()
 					newWorld = append(newWorld, part...)
 					mutex.Unlock()
@@ -175,16 +170,16 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			} else { // when the thread cannot be divided by the thread(has remainders)
 				for i := 0; i < threads; i++ {
 					if i == (p.Threads - 1) { // if it is the last thread
-						go worker(p, i*workerHeight, height, width, newWorld, outSec[i])
+						go worker(p, i*workerHeight, height, width, newWorld, out[i])
 					} else { //else
-						go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, outSec[i])
+						go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
 					}
 				}
 
 				newWorld = makeMatrix(0, 0)
 
 				for i := 0; i < threads; i++ {
-					part := <-outSec[i]
+					part := <-out[i]
 					mutex.Lock()
 					newWorld = append(newWorld, part...)
 					mutex.Unlock()
