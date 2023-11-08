@@ -16,6 +16,8 @@ type distributorChannels struct {
 	ioInput    <-chan uint8
 }
 
+var mutex sync.Mutex
+
 func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	var cells []util.Cell
 
@@ -72,6 +74,7 @@ func worker(p Params, startY, endY, width int, newWorld [][]byte, out chan<- [][
 }
 
 func countingCells(p Params, world [][]uint8) int {
+	mutex.Lock()
 	fmt.Println("ENTERED COUNTING CELLS")
 	cells := 0
 
@@ -82,6 +85,7 @@ func countingCells(p Params, world [][]uint8) int {
 			}
 		}
 	}
+	mutex.Unlock()
 	return cells
 }
 
@@ -121,12 +125,13 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		c.events <- CellFlipped{0, cell}
 	}
 
-	//Ticker (STEP 3)
+	//TODO: Ticker (STEP 3)
 	go func() {
 		t := time.NewTicker(2 * time.Second)
 		for {
 			select {
 			case <-t.C: //when value passed down to the channel, alert events
+				fmt.Println("FINISHEDTURNS IN GOROUT:", finishedTurns, "ALIVE CELLS:", countingCells(p, cellsWorld))
 				c.events <- AliveCellsCount{finishedTurns, countingCells(p, cellsWorld)}
 
 			case f := <-fin: //passing down the value to the channel
@@ -183,7 +188,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	threads := p.Threads
 	//var workersWorld [][]uint8
-
+	//TODO: Workers and Threads
 	if threads == 1 {
 		for turn := 0; turn < p.Turns; turn++ {
 			fmt.Println("Turn: ", turn)
@@ -191,8 +196,10 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			for _, cell := range chk {
 				c.events <- CellFlipped{turn + 1, cell}
 			}
+			mutex.Lock()
 			newWorld = calculateNextState(p, 0, height, width, newWorld)
 			cellsWorld = newWorld
+			mutex.Unlock()
 			finishedTurns++
 			c.events <- TurnComplete{turn + 1}
 		}
@@ -241,7 +248,9 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 				m.Unlock()
 			}
 			//newWorld = newPixelData
+			mutex.Lock()
 			cellsWorld = newWorld
+			mutex.Unlock()
 			finishedTurns++
 			fmt.Println("FINISHEDTURNS: ", finishedTurns)
 
