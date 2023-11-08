@@ -189,75 +189,75 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	threads := p.Threads
 	//var workersWorld [][]uint8
 	//TODO: Workers and Threads
-	if threads == 1 {
-		for turn := 0; turn < p.Turns; turn++ {
-			fmt.Println("Turn: ", turn)
-			chk := calculateAliveCells(p, world)
-			for _, cell := range chk {
-				c.events <- CellFlipped{turn + 1, cell}
-			}
-			mutex.Lock()
-			newWorld = calculateNextState(p, 0, height, width, newWorld)
-			cellsWorld = newWorld
-			mutex.Unlock()
-			finishedTurns++
-			c.events <- TurnComplete{turn + 1}
-		}
-		//finalWorld = world
-	} else {
-		workerHeight := height / threads
-		out := make([]chan [][]uint8, threads)
-		for i := range out {
-			out[i] = make(chan [][]uint8)
-		}
+	//if threads == 1 {
+	//	for turn := 0; turn < p.Turns; turn++ {
+	//		fmt.Println("Turn: ", turn)
+	//		chk := calculateAliveCells(p, world)
+	//		for _, cell := range chk {
+	//			c.events <- CellFlipped{turn + 1, cell}
+	//		}
+	//		mutex.Lock()
+	//		newWorld = calculateNextState(p, 0, height, width, newWorld)
+	//		cellsWorld = newWorld
+	//		mutex.Unlock()
+	//		finishedTurns++
+	//		c.events <- TurnComplete{turn + 1}
+	//	}
+	//finalWorld = world
+	//} else {
+	workerHeight := height / threads
+	out := make([]chan [][]uint8, threads)
+	for i := range out {
+		out[i] = make(chan [][]uint8)
+	}
 
-		// TODO: Execute all turns of the Game of Life.
-		for turn := 0; turn < p.Turns; turn++ {
-			//newPixelData = make([][]uint8, 0)
-			chk := calculateAliveCells(p, world)
-			for _, cell := range chk {
-				c.events <- CellFlipped{turn + 1, cell}
+	// TODO: Execute all turns of the Game of Life.
+	for turn := 0; turn < p.Turns; turn++ {
+		//newPixelData = make([][]uint8, 0)
+		chk := calculateAliveCells(p, world)
+		for _, cell := range chk {
+			c.events <- CellFlipped{turn + 1, cell}
+		}
+		if height%threads == 0 { // when the thread can be divided
+			for i := 0; i < threads; i++ {
+				go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
 			}
-			if height%threads == 0 { // when the thread can be divided
-				for i := 0; i < threads; i++ {
+			m.Lock()
+			newWorld = makeMatrix(0, 0)
+
+			for j := 0; j < threads; j++ {
+				output := <-out[j]
+				newWorld = append(newWorld, output...)
+			}
+			m.Unlock()
+		} else { // when the thread cannot be divided by the thread(has remainders)
+			for i := 0; i < threads; i++ {
+				if i == (threads - 1) { // if it is the last thread  //half of them working on 36 and others dividing the remainder evenly
+					go worker(p, i*workerHeight, height, width, newWorld, out[i])
+				} else { //else
 					go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
 				}
-				m.Lock()
-				newWorld = makeMatrix(0, 0)
-
-				for j := 0; j < threads; j++ {
-					output := <-out[j]
-					newWorld = append(newWorld, output...)
-				}
-				m.Unlock()
-			} else { // when the thread cannot be divided by the thread(has remainders)
-				for i := 0; i < threads; i++ {
-					if i == (threads - 1) { // if it is the last thread  //half of them working on 36 and others dividing the remainder evenly
-						go worker(p, i*workerHeight, height, width, newWorld, out[i])
-					} else { //else
-						go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
-					}
-				}
-				m.Lock()
-				newWorld = makeMatrix(0, 0)
-
-				for j := 0; j < threads; j++ {
-					output := <-out[j]
-					newWorld = append(newWorld, output...)
-				}
-				m.Unlock()
 			}
-			//newWorld = newPixelData
-			mutex.Lock()
-			cellsWorld = newWorld
-			mutex.Unlock()
-			finishedTurns++
-			fmt.Println("FINISHEDTURNS: ", finishedTurns)
+			m.Lock()
+			newWorld = makeMatrix(0, 0)
 
-			c.events <- TurnComplete{turn + 1}
+			for j := 0; j < threads; j++ {
+				output := <-out[j]
+				newWorld = append(newWorld, output...)
+			}
+			m.Unlock()
 		}
-		//finalWorld = world
+		//newWorld = newPixelData
+		mutex.Lock()
+		cellsWorld = newWorld
+		mutex.Unlock()
+		finishedTurns++
+		fmt.Println("FINISHEDTURNS: ", finishedTurns)
+
+		c.events <- TurnComplete{turn + 1}
 	}
+	//finalWorld = world
+	//}
 	finalWorld := newWorld
 
 	// TODO: Report the final state using FinalTurnCompleteEvent.
