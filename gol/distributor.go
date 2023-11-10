@@ -57,20 +57,20 @@ func calculateNextState(p Params, startY, endY, width int, world [][]byte, c dis
 			if world[y][x] == 255 {
 				if sum < 2 {
 					newWorld[y-startY][x] = 0
-					fmt.Println("Y, X: ", y+startY, x)
+					//fmt.Println("Y, X: ", y+startY, x)
 					cell := util.Cell{X: x, Y: y}
 					cnt++
 					c.events <- CellFlipped{turn, cell}
 				} else if sum == 2 || sum == 3 {
 					newWorld[y-startY][x] = 255
-					cell := util.Cell{X: x, Y: y}
-					fmt.Println("Y, X: ", y-startY, x)
-					c.events <- CellFlipped{turn, cell}
+					//cell := util.Cell{X: x, Y: y}
+					//fmt.Println("Y, X: ", y-startY, x)
+					//c.events <- CellFlipped{turn, cell}
 					cnt++
 				} else {
 					newWorld[y-startY][x] = 0
 					cell := util.Cell{X: x, Y: y}
-					fmt.Println("Y, X: ", y-startY, x)
+					//fmt.Println("Y, X: ", y-startY, x)
 					c.events <- CellFlipped{turn, cell}
 					cnt++
 				}
@@ -78,7 +78,7 @@ func calculateNextState(p Params, startY, endY, width int, world [][]byte, c dis
 				if sum == 3 {
 					newWorld[y-startY][x] = 255
 					cell := util.Cell{X: x, Y: y}
-					fmt.Println("Y, X: ", y-startY, x)
+					//fmt.Println("Y, X: ", y-startY, x)
 					c.events <- CellFlipped{turn, cell}
 					cnt++
 				}
@@ -139,6 +139,8 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		for x := range world[y] {
 			if <-c.ioInput > 0 {
 				world[y][x] = 255
+				cell := util.Cell{X: x, Y: y}
+				c.events <- CellFlipped{0, cell}
 				//c.events <- CellFlipped{0, }
 			} else {
 				world[y][x] = 0
@@ -148,10 +150,10 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	newWorld := world
 
-	chk := calculateAliveCells(p, newWorld)
-	for _, cell := range chk {
-		c.events <- CellFlipped{0, cell}
-	}
+	//chk := calculateAliveCells(p, newWorld)
+	//for _, cell := range chk {
+	//	c.events <- CellFlipped{0, cell}
+	//}
 	//c.events <- TurnComplete{0}
 
 	// Make sure to send this event for all cells that are alive when the image is loaded in.
