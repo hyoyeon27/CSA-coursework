@@ -21,7 +21,6 @@ type distributorChannels struct {
 func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	var cells []util.Cell
 
-	//fmt.Println("WORLD length: ", len(world))
 	for y := 0; y < p.ImageHeight; y++ {
 		for x := 0; x < p.ImageWidth; x++ {
 			if world[y][x] == 255 {
@@ -103,9 +102,10 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	c.ioFilename <- fmt.Sprintf("%dx%d", width, height)
 
 	var m sync.Mutex
-	//var cellsWorld [][]uint8
 
 	var finishedTurns int
+
+	twice := false
 
 	fin := make(chan bool)
 
@@ -144,16 +144,15 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 					t.Stop()
 				}
 			}
-
 		}
 	}()
 
 	//keypress (STEP 5)
 	// TODO: CAN I add a channel or import library from the github <- ask
 	go func() {
-		keyboard := <-keyPresses
 		for {
-			if keyboard == 's' {
+			switch <-keyPresses {
+			case 's':
 				c.ioCommand <- ioOutput
 				c.ioFilename <- fmt.Sprintf("%dx%d", height, width)
 				for y := 0; y < height; y++ {
@@ -162,7 +161,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 					}
 				}
 				c.events <- ImageOutputComplete{p.Turns, fmt.Sprintf("%dx%d", width, height)}
-			} else if keyboard == 'q' {
+			case 'q':
 				c.ioCommand <- ioOutput
 				c.ioFilename <- fmt.Sprintf("%dx%d", height, width)
 				for y := 0; y < height; y++ {
@@ -171,20 +170,23 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 					}
 				}
 				c.events <- ImageOutputComplete{p.Turns, fmt.Sprintf("%dx%d", width, height)}
+				fin <- true
 				c.ioCommand <- ioCheckIdle
 				<-c.ioIdle
 				c.events <- StateChange{p.Turns, Quitting}
 				close(c.events)
-			} else if keyboard == 'p' {
-				c.events <- StateChange{finishedTurns, Paused}
-				fmt.Println("Current turn being processed: ", finishedTurns)
-				m.Lock()
-				keyboard = <-keyPresses
-				if keyboard == 'p' {
+			case 'p':
+				if twice == true {
 					c.events <- StateChange{finishedTurns, Executing}
 					fmt.Println("Continuing")
+					twice = false
+					m.Unlock()
+				} else { //pausing
+					c.events <- StateChange{finishedTurns, Paused}
+					fmt.Println("Current turn being processed: ", finishedTurns)
+					twice = true
+					m.Lock()
 				}
-				m.Unlock()
 
 			}
 		}
@@ -202,9 +204,6 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	// TODO: Execute all turns of the Game of Life.
 	for turn := 0; turn < p.Turns; turn++ {
 		m.Lock()
-
-		fmt.Println("threads: ", threads)
-
 		if height%threads == 0 { // when the thread can be divided
 			for i := 0; i < threads; i++ {
 				go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i], c, turn+1)
@@ -234,13 +233,10 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			newWorld = cellsWorld
 		}
 		finishedTurns++
-		fmt.Println("FINISHEDTURNS: ", finishedTurns)
 
 		c.events <- TurnComplete{turn + 1}
 
 		m.Unlock()
-		fmt.Println("Length: ", len(newWorld))
-		fmt.Println("distributor uLocked")
 	}
 	finalWorld := newWorld
 
