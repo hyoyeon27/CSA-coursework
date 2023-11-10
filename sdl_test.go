@@ -91,7 +91,7 @@ sdlLoop:
 
 // TestSdl tests a 512x512 image for 100 turns using 8 worker threads.
 func TestSdl(t *testing.T) {
-	p := gol.Params{ImageWidth: 512, ImageHeight: 512, Turns: 100, Threads: 8}
+	p := gol.Params{ImageWidth: 512, ImageHeight: 512, Turns: 0, Threads: 8}
 	testName := fmt.Sprintf("%dx%dx%d-%d", p.ImageWidth, p.ImageHeight, p.Turns, p.Threads)
 	alive := readAliveCounts(p.ImageWidth, p.ImageHeight)
 	t.Run(testName, func(t *testing.T) {

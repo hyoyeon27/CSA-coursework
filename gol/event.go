@@ -48,6 +48,7 @@ type StateChange struct { // implements Event
 // This even should be sent every time a cell changes state.
 // Make sure to send this event for all cells that are alive when the image is loaded in.
 type CellFlipped struct { // implements Event
+
 	CompletedTurns int
 	Cell           util.Cell
 }
@@ -127,6 +128,7 @@ func (event FinalTurnComplete) String() string {
 }
 
 func (event FinalTurnComplete) GetCompletedTurns() int {
+	fmt.Println("Turn: ", event)
 	return event.CompletedTurns
 }
 

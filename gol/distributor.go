@@ -7,6 +7,8 @@ import (
 	"uk.ac.bris.cs/gameoflife/util"
 )
 
+var m sync.Mutex
+
 type distributorChannels struct {
 	events     chan<- Event
 	ioCommand  chan<- ioCommand
@@ -16,11 +18,12 @@ type distributorChannels struct {
 	ioInput    <-chan uint8
 }
 
-var mutex sync.Mutex
+//var mutex sync.Mutex
 
 func calculateAliveCells(p Params, world [][]byte) []util.Cell {
 	var cells []util.Cell
 
+	//fmt.Println("WORLD length: ", len(world))
 	for y := 0; y < p.ImageHeight; y++ {
 		for x := 0; x < p.ImageWidth; x++ {
 			if world[y][x] == 255 {
@@ -39,11 +42,12 @@ func makeMatrix(height, width int) [][]uint8 {
 	return matrix
 }
 
-func calculateNextState(p Params, startY, endY, width int, world [][]byte) [][]uint8 {
+func calculateNextState(p Params, startY, endY, width int, world [][]byte, c distributorChannels, turn int) [][]uint8 {
 	workersHeight := endY - startY
 	height := p.ImageHeight
 
 	newWorld := makeMatrix(workersHeight, width)
+	cnt := 0
 
 	for y := startY; y < endY; y++ {
 		for x := 0; x < width; x++ {
@@ -53,39 +57,63 @@ func calculateNextState(p Params, startY, endY, width int, world [][]byte) [][]u
 			if world[y][x] == 255 {
 				if sum < 2 {
 					newWorld[y-startY][x] = 0
+					fmt.Println("Y, X: ", y+startY, x)
+					cell := util.Cell{X: x, Y: y}
+					cnt++
+					c.events <- CellFlipped{turn, cell}
 				} else if sum == 2 || sum == 3 {
 					newWorld[y-startY][x] = 255
+					cell := util.Cell{X: x, Y: y}
+					fmt.Println("Y, X: ", y-startY, x)
+					c.events <- CellFlipped{turn, cell}
+					cnt++
 				} else {
 					newWorld[y-startY][x] = 0
+					cell := util.Cell{X: x, Y: y}
+					fmt.Println("Y, X: ", y-startY, x)
+					c.events <- CellFlipped{turn, cell}
+					cnt++
 				}
 			} else {
 				if sum == 3 {
 					newWorld[y-startY][x] = 255
+					cell := util.Cell{X: x, Y: y}
+					fmt.Println("Y, X: ", y-startY, x)
+					c.events <- CellFlipped{turn, cell}
+					cnt++
 				}
 			}
 		}
 	}
+
+	//fmt.Println("Alives: ", len(calculateAliveCells(p, newWorld)))
+	//fmt.Println("Count: ", cnt)
+
 	return newWorld
 }
 
-func worker(p Params, startY, endY, width int, newWorld [][]byte, out chan<- [][]uint8) {
-	imagePart := calculateNextState(p, startY, endY, width, newWorld)
+func worker(p Params, startY, endY, width int, newWorld [][]byte, out chan<- [][]uint8, c distributorChannels, turn int) {
+	imagePart := calculateNextState(p, startY, endY, width, newWorld, c, turn)
 	out <- imagePart
 }
 
 func countingCells(p Params, world [][]uint8) int {
-	mutex.Lock()
-	fmt.Println("ENTERED COUNTING CELLS")
+	//mutex.Lock()
+	m.Lock()
+	//fmt.Println("counting cells Locked")
+	//fmt.Println("ENTERED COUNTING CELLS")
 	cells := 0
 
-	for y := 0; y < p.ImageHeight; y++ {
+	for y := 0; y < p.ImageWidth; y++ {
 		for x := 0; x < p.ImageWidth; x++ {
 			if world[y][x] == 255 {
 				cells++
 			}
 		}
 	}
-	mutex.Unlock()
+	//mutex.Unlock()
+	m.Unlock()
+	//fmt.Println("Countingcells uLocked")
 	return cells
 }
 
@@ -97,7 +125,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	c.ioFilename <- fmt.Sprintf("%dx%d", width, height)
 
 	var m sync.Mutex
-	var cellsWorld [][]uint8
+	//var cellsWorld [][]uint8
 
 	var finishedTurns int
 
@@ -111,6 +139,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		for x := range world[y] {
 			if <-c.ioInput > 0 {
 				world[y][x] = 255
+				//c.events <- CellFlipped{0, }
 			} else {
 				world[y][x] = 0
 			}
@@ -119,11 +148,13 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	newWorld := world
 
-	// Make sure to send this event for all cells that are alive when the image is loaded in.
-	flip := calculateAliveCells(p, world)
-	for _, cell := range flip {
+	chk := calculateAliveCells(p, newWorld)
+	for _, cell := range chk {
 		c.events <- CellFlipped{0, cell}
 	}
+	//c.events <- TurnComplete{0}
+
+	// Make sure to send this event for all cells that are alive when the image is loaded in.
 
 	//TODO: Ticker (STEP 3)
 	go func() {
@@ -131,8 +162,13 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 		for {
 			select {
 			case <-t.C: //when value passed down to the channel, alert events
-				fmt.Println("FINISHEDTURNS IN GOROUT:", finishedTurns, "ALIVE CELLS:", countingCells(p, cellsWorld))
-				c.events <- AliveCellsCount{finishedTurns, countingCells(p, cellsWorld)}
+				m.Lock()
+				//fmt.Println("Ticker Locked")
+				fmt.Println("FINISHEDTURNS IN GOROUT:", finishedTurns, "ALIVE CELLS:", countingCells(p, newWorld))
+				//fmt.Println(len(newWorld))
+				c.events <- AliveCellsCount{finishedTurns, countingCells(p, newWorld)}
+				m.Unlock()
+				//fmt.Println("Ticker unlocked")
 
 			case f := <-fin: //passing down the value to the channel
 				if f == true { //if true, stop
@@ -187,24 +223,8 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	}()
 
 	threads := p.Threads
-	//var workersWorld [][]uint8
+
 	//TODO: Workers and Threads
-	//if threads == 1 {
-	//	for turn := 0; turn < p.Turns; turn++ {
-	//		fmt.Println("Turn: ", turn)
-	//		chk := calculateAliveCells(p, world)
-	//		for _, cell := range chk {
-	//			c.events <- CellFlipped{turn + 1, cell}
-	//		}
-	//		mutex.Lock()
-	//		newWorld = calculateNextState(p, 0, height, width, newWorld)
-	//		cellsWorld = newWorld
-	//		mutex.Unlock()
-	//		finishedTurns++
-	//		c.events <- TurnComplete{turn + 1}
-	//	}
-	//finalWorld = world
-	//} else {
 	workerHeight := height / threads
 	out := make([]chan [][]uint8, threads)
 	for i := range out {
@@ -213,48 +233,56 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	// TODO: Execute all turns of the Game of Life.
 	for turn := 0; turn < p.Turns; turn++ {
-		//newPixelData = make([][]uint8, 0)
-		chk := calculateAliveCells(p, world)
-		for _, cell := range chk {
-			c.events <- CellFlipped{turn + 1, cell}
-		}
+		m.Lock()
+
+		fmt.Println("threads: ", threads)
+
 		if height%threads == 0 { // when the thread can be divided
 			for i := 0; i < threads; i++ {
-				go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
+				go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i], c, turn+1)
 			}
-			m.Lock()
-			newWorld = makeMatrix(0, 0)
+			//m.Lock()
+			cellsWorld := makeMatrix(0, 0)
 
 			for j := 0; j < threads; j++ {
 				output := <-out[j]
-				newWorld = append(newWorld, output...)
+				cellsWorld = append(cellsWorld, output...)
 			}
-			m.Unlock()
+			newWorld = cellsWorld
+			//m.Unlock()
 		} else { // when the thread cannot be divided by the thread(has remainders)
 			for i := 0; i < threads; i++ {
 				if i == (threads - 1) { // if it is the last thread  //half of them working on 36 and others dividing the remainder evenly
-					go worker(p, i*workerHeight, height, width, newWorld, out[i])
+					go worker(p, i*workerHeight, height, width, newWorld, out[i], c, turn+1)
 				} else { //else
-					go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i])
+					go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i], c, turn+1)
 				}
 			}
-			m.Lock()
-			newWorld = makeMatrix(0, 0)
+			//m.Lock()
+			cellsWorld := makeMatrix(0, 0)
 
 			for j := 0; j < threads; j++ {
 				output := <-out[j]
-				newWorld = append(newWorld, output...)
+				cellsWorld = append(cellsWorld, output...)
+
 			}
-			m.Unlock()
+			//fmt.Println("Lenght newWorld:", len(newWorld))
+			//fmt.Println("width:", len(newWorld[0]))
+			//m.Unlock()
+			newWorld = cellsWorld
 		}
 		//newWorld = newPixelData
-		mutex.Lock()
-		cellsWorld = newWorld
-		mutex.Unlock()
+		//m.Lock()
+		//newWorld = cellsWorld
+		//mutex.Unlock()
 		finishedTurns++
 		fmt.Println("FINISHEDTURNS: ", finishedTurns)
 
 		c.events <- TurnComplete{turn + 1}
+
+		m.Unlock()
+		fmt.Println("Length: ", len(newWorld))
+		fmt.Println("distributor uLocked")
 	}
 	//finalWorld = world
 	//}
