@@ -102,11 +102,8 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	c.ioFilename <- fmt.Sprintf("%dx%d", width, height)
 
 	var m sync.Mutex
-
 	var finishedTurns int
-
 	twice := false
-
 	fin := make(chan bool)
 
 	// distributor divides the work between workers and interacts with other goroutines.
