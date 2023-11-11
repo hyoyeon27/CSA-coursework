@@ -128,7 +128,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 			select {
 			case <-t.C: //when value passed down to the channel, alert events
 				m.Lock()
-				fmt.Println("FINISHEDTURNS IN GOROUT:", finishedTurns, "ALIVE CELLS:", countingCells(p, newWorld))
+				//fmt.Println("FINISHEDTURNS IN GOROUT:", finishedTurns, "ALIVE CELLS:", countingCells(p, newWorld))
 				c.events <- AliveCellsCount{finishedTurns, countingCells(p, newWorld)}
 				m.Unlock()
 
