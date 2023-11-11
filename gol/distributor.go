@@ -111,17 +111,10 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 
 	// distributor divides the work between workers and interacts with other goroutines.
 	// TODO: Create a 2D slice to store the world.
-	world := make([][]byte, height)
-	for y := range world {
-		world[y] = make([]byte, width)
-		for x := range world[y] {
-			if <-c.ioInput > 0 {
-				world[y][x] = 255
-				cell := util.Cell{X: x, Y: y}
-				c.events <- CellFlipped{0, cell}
-			} else {
-				world[y][x] = 0
-			}
+	world := makeMatrix(height, width)
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			world[y][x] = <-c.ioInput
 		}
 	}
 
