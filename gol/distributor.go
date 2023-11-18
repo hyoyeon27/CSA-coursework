@@ -150,7 +150,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 						c.ioOutput <- world[y][x]
 					}
 				}
-				c.events <- ImageOutputComplete{p.Turns, fmt.Sprintf("%dx%d", width, height)}
+				c.events <- ImageOutputComplete{finishedTurns, fmt.Sprintf("%dx%d", width, height)}
 			case 'q':
 				c.ioCommand <- ioOutput
 				c.ioFilename <- fmt.Sprintf("%dx%d", height, width)
@@ -159,11 +159,11 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 						c.ioOutput <- world[y][x]
 					}
 				}
-				c.events <- ImageOutputComplete{p.Turns, fmt.Sprintf("%dx%d", width, height)}
+				c.events <- ImageOutputComplete{finishedTurns, fmt.Sprintf("%dx%d", width, height)}
 				fin <- true
 				c.ioCommand <- ioCheckIdle
 				<-c.ioIdle
-				c.events <- StateChange{p.Turns, Quitting}
+				c.events <- StateChange{finishedTurns, Quitting}
 				close(c.events)
 			case 'p':
 				if twice == true {
