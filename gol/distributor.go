@@ -2,6 +2,7 @@ package gol
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 	"uk.ac.bris.cs/gameoflife/util"
@@ -138,13 +139,13 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	}()
 
 	//keypress (STEP 5)
-	// TODO: CAN I add a channel or import library from the github <- ask
+	// TODO: keyPress
 	go func() {
 		for {
 			switch <-keyPresses {
 			case 's':
 				c.ioCommand <- ioOutput
-				c.ioFilename <- fmt.Sprintf("%dx%d", height, width)
+				c.ioFilename <- fmt.Sprintf("%dx%d\n", height, width)
 				for y := 0; y < height; y++ {
 					for x := 0; x < width; x++ {
 						c.ioOutput <- world[y][x]
@@ -165,6 +166,7 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 				<-c.ioIdle
 				c.events <- StateChange{finishedTurns, Quitting}
 				close(c.events)
+				os.Exit(0)
 			case 'p':
 				if twice == true {
 					c.events <- StateChange{finishedTurns, Executing}
@@ -194,34 +196,28 @@ func distributor(p Params, c distributorChannels, keyPresses <-chan rune) {
 	// TODO: Execute all turns of the Game of Life.
 	for turn := 0; turn < p.Turns; turn++ {
 		m.Lock()
-		if height%threads == 0 { // when the thread can be divided
-			for i := 0; i < threads; i++ {
+		remThre := height % threads
+		prevHei := 0
+		j := 0
+
+		for i := 0; i < threads; i++ {
+			if i > (threads-remThre)-1 { // if it is the last thread  //half of them working on 36 and others dividing the remainder evenly
+				remHei := (height - prevHei) / remThre
+				go worker(p, remHei*j+prevHei, (j+1)*remHei+prevHei, width, newWorld, out[i], c, turn+1)
+				j++
+			} else { //else
 				go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i], c, turn+1)
+				prevHei = (i + 1) * workerHeight
 			}
-			cellsWorld := makeMatrix(0, 0)
-
-			for j := 0; j < threads; j++ {
-				output := <-out[j]
-				cellsWorld = append(cellsWorld, output...)
-			}
-			newWorld = cellsWorld
-		} else { // when the thread cannot be divided by the thread(has remainders)
-			for i := 0; i < threads; i++ {
-				if i == (threads - 1) { // if it is the last thread  //half of them working on 36 and others dividing the remainder evenly
-					go worker(p, i*workerHeight, height, width, newWorld, out[i], c, turn+1)
-				} else { //else
-					go worker(p, i*workerHeight, (i+1)*workerHeight, width, newWorld, out[i], c, turn+1)
-				}
-			}
-			cellsWorld := makeMatrix(0, 0)
-
-			for j := 0; j < threads; j++ {
-				output := <-out[j]
-				cellsWorld = append(cellsWorld, output...)
-
-			}
-			newWorld = cellsWorld
 		}
+		cellsWorld := makeMatrix(0, 0)
+
+		for j := 0; j < threads; j++ {
+			output := <-out[j]
+			cellsWorld = append(cellsWorld, output...)
+
+		}
+		newWorld = cellsWorld
 		finishedTurns++
 
 		c.events <- TurnComplete{turn + 1}
